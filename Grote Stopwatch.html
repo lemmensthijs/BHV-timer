@@ -142,13 +142,14 @@ button:focus-visible,input:focus-visible{outline:3px solid var(--run);outline-of
 }
 .minbox input::-webkit-outer-spin-button,.minbox input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
 .minbox span{font-size:15px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
-.presets{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.presets{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
 .presets button{
   min-height:44px;border-radius:12px;background:var(--bg);border:1px solid var(--line);color:var(--digits);
   font-family:var(--font-ui);font-size:16px;font-weight:600;cursor:pointer;touch-action:manipulation;
   font-variant-numeric:tabular-nums;
 }
 .presets button[aria-pressed="true"]{border-color:var(--digits)}
+.presets .pu{margin-left:4px;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
 .hint{margin:0;font-size:14px;line-height:1.45;color:var(--muted)}
 .hint.warn{color:var(--pause)}
 .test-row{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
@@ -222,23 +223,24 @@ button:focus-visible,input:focus-visible{outline:3px solid var(--run);outline-of
         <button class="step" type="button" id="minMinus" aria-label="Eén minuut minder">&minus;</button>
         <label class="minbox" for="minInput">
           <input id="minInput" type="number" inputmode="numeric" min="1" max="599" step="1" value="40" aria-label="Aantal minuten">
-          <span>min</span>
+          <span id="minUnit">min</span>
         </label>
         <button class="step" type="button" id="minPlus" aria-label="Eén minuut meer">+</button>
       </div>
       <div class="presets" id="presets">
-        <button type="button" data-min="5">5</button>
-        <button type="button" data-min="10">10</button>
-        <button type="button" data-min="15">15</button>
-        <button type="button" data-min="20">20</button>
-        <button type="button" data-min="30">30</button>
-        <button type="button" data-min="40">40</button>
-        <button type="button" data-min="45">45</button>
-        <button type="button" data-min="60">60</button>
+        <button type="button" data-sec="30">30<span class="pu">sec</span></button>
+        <button type="button" data-sec="300">5<span class="pu">min</span></button>
+        <button type="button" data-sec="600">10<span class="pu">min</span></button>
+        <button type="button" data-sec="900">15<span class="pu">min</span></button>
+        <button type="button" data-sec="1200">20<span class="pu">min</span></button>
+        <button type="button" data-sec="1800">30<span class="pu">min</span></button>
+        <button type="button" data-sec="2400">40<span class="pu">min</span></button>
+        <button type="button" data-sec="2700">45<span class="pu">min</span></button>
+        <button type="button" data-sec="3600">60<span class="pu">min</span></button>
       </div>
       <div class="test-row">
         <button class="btn-test" type="button" id="btnTest">Alarm testen</button>
-        <p class="hint">Na afloop gaat de ambulancesirene af tot je op Alarm uit tikt.</p>
+        <p class="hint">Na afloop zwelt de ambulancesirene in 10 seconden aan van stil tot volle sterkte en klinkt tot je op Alarm uit tikt. De test duurt 12 seconden.</p>
       </div>
     </div>
 
@@ -293,7 +295,7 @@ var SIRENE_SRC = "data:audio/mpeg;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjYwLjE
       var s = JSON.parse(localStorage.getItem(KEY) || 'null');
       if (s && typeof s.acc === 'number' && typeof s.startedAt === 'number') {
         state.mode = s.mode === 'up' ? 'up' : 'down';
-        state.durationMs = (typeof s.durationMs === 'number' && s.durationMs >= 60000) ? s.durationMs : DEFAULT_MIN * 60000;
+        state.durationMs = (typeof s.durationMs === 'number' && s.durationMs >= 1000) ? s.durationMs : DEFAULT_MIN * 60000;
         state.running = !!s.running; state.startedAt = s.startedAt; state.acc = s.acc; state.finished = !!s.finished;
       }
     } catch (e) {}
@@ -309,7 +311,10 @@ var SIRENE_SRC = "data:audio/mpeg;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjYwLjE
   }
   function remaining(){ return Math.max(0, state.durationMs - elapsed()); }
   function pad(n){ return n < 10 ? '0' + n : String(n); }
-  function durationMin(){ return Math.round(state.durationMs / 60000); }
+  function durationLabel(){
+    var sec = Math.round(state.durationMs / 1000);
+    return sec < 60 ? sec + ' sec' : Math.round(sec / 60) + ' min';
+  }
 
   function currentState(){
     if (alarmOn) return 'alarm';
@@ -364,9 +369,9 @@ var SIRENE_SRC = "data:audio/mpeg;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjYwLjE
       var frac = state.durationMs > 0 ? remaining() / state.durationMs : 0;
       progressFill.style.transform = 'scaleX(' + frac.toFixed(4) + ')';
     }
-    app.classList.toggle('ending', down && (st === 'running' || st === 'paused') && remaining() <= 60000);
+    app.classList.toggle('ending', down && (st === 'running' || st === 'paused') && remaining() <= Math.min(60000, state.durationMs / 4));
 
-    var chip = down ? durationMin() + ' min' : 'Optellen';
+    var chip = down ? durationLabel() : 'Optellen';
     if (chipText.textContent !== chip) chipText.textContent = chip;
 
     var canReset = st !== 'idle';
@@ -405,22 +410,67 @@ var SIRENE_SRC = "data:audio/mpeg;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjYwLjE
     digits.style.fontSize = Math.floor((stack ? fStack : fLine) * 0.94) + 'px';
   }
 
-  /* ---------- Alarm ---------- */
+  /* ---------- Alarm ----------
+     De sirene zwelt in FADE_SEC seconden aan van stil tot volle sterkte. Dat loopt via Web Audio,
+     omdat een iPhone het volume van een gewoon audio-element niet laat regelen.
+     Lukt Web Audio niet, dan speelt het audio-element met een volumeschuif waar de browser dat toestaat. */
+  var FADE_SEC = 10;
   var siren = document.createElement('audio');
   siren.src = SIRENE_SRC;
   siren.loop = true;
   siren.preload = 'auto';
   siren.setAttribute('playsinline', '');
-  var audioUnlocked = false, testTimer = null;
+  var ctx = null, gainNode = null, sirenBuffer = null, bufferPromise = null, bufSrc = null;
+  var elFadeTimer = null, alarmToken = 0, audioUnlocked = false, testTimer = null;
   var btnTest = document.getElementById('btnTest');
 
   function audioSessionPlayback(){
     try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; } catch (e) {}
   }
-  /* Telefoons laten geluid pas later afspelen als het eerst binnen een tik is gestart */
+  function dataUriToBuffer(uri){
+    var bin = atob(uri.slice(uri.indexOf(',') + 1));
+    var bytes = new Uint8Array(bin.length);
+    for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    return bytes.buffer;
+  }
+  function ensureContext(){
+    var AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return null;
+    if (!ctx) {
+      try {
+        ctx = new AC();
+        gainNode = ctx.createGain();
+        gainNode.gain.value = 0;
+        gainNode.connect(ctx.destination);
+      } catch (e) { ctx = null; return null; }
+    }
+    if (ctx.state !== 'running' && ctx.resume) { try { var r = ctx.resume(); if (r && r.catch) r.catch(function(){}); } catch (e) {} }
+    return ctx;
+  }
+  function ensureBuffer(){
+    if (sirenBuffer) return Promise.resolve(sirenBuffer);
+    if (!ctx) return Promise.reject(new Error('geen audio'));
+    if (!bufferPromise) {
+      bufferPromise = new Promise(function(resolve, reject){
+        var ok = function(b){ sirenBuffer = b; resolve(b); };
+        var fail = function(e){ bufferPromise = null; reject(e); };
+        try {
+          var p = ctx.decodeAudioData(dataUriToBuffer(SIRENE_SRC), ok, fail);
+          if (p && p.then) p.then(ok, fail);
+        } catch (e) { fail(e); }
+      });
+    }
+    return bufferPromise;
+  }
+  /* Geluid moet binnen een tik worden vrijgegeven, anders weigert de telefoon het later af te spelen */
   function unlockAudio(){
-    if (audioUnlocked || alarmOn || testTimer) return;
     audioSessionPlayback();
+    var c = ensureContext();
+    if (c) {
+      try { var s = c.createBufferSource(); s.buffer = c.createBuffer(1, 1, 22050); s.connect(c.destination); s.start(0); } catch (e) {}
+      ensureBuffer().catch(function(){});
+    }
+    if (audioUnlocked || alarmOn || testTimer) return;
     try {
       siren.muted = true;
       var p = siren.play();
@@ -432,43 +482,90 @@ var SIRENE_SRC = "data:audio/mpeg;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjYwLjE
       } else { siren.muted = false; }
     } catch (e) { siren.muted = false; }
   }
-  function playSiren(){
-    audioSessionPlayback();
+  /* Kwadratische curve: klinkt als een gelijkmatige toename, niet als een plotselinge sprong */
+  function fadeCurve(){
+    var n = 64, c = new Float32Array(n);
+    for (var i = 0; i < n; i++) { var x = i / (n - 1); c[i] = x * x; }
+    return c;
+  }
+  function stopSirenSound(){
+    alarmToken++;
+    if (bufSrc) { try { bufSrc.stop(); } catch (e) {} try { bufSrc.disconnect(); } catch (e) {} bufSrc = null; }
+    if (gainNode) { try { gainNode.gain.cancelScheduledValues(0); gainNode.gain.value = 0; } catch (e) {} }
+    if (elFadeTimer) { clearInterval(elFadeTimer); elFadeTimer = null; }
+    try { siren.pause(); siren.currentTime = 0; siren.volume = 1; } catch (e) {}
+  }
+  function playElementFade(token){
+    if (token !== alarmToken) return;
     siren.muted = false;
     try { siren.currentTime = 0; } catch (e) {}
+    try { siren.volume = 0; } catch (e) {}
     try { var p = siren.play(); if (p && p.catch) p.catch(function(){}); } catch (e) {}
+    var t0 = Date.now();
+    var id = setInterval(function(){
+      if (token !== alarmToken) { clearInterval(id); return; }
+      var x = Math.min(1, (Date.now() - t0) / (FADE_SEC * 1000));
+      try { siren.volume = x * x; } catch (e) {}
+      if (x >= 1) { clearInterval(id); if (elFadeTimer === id) elFadeTimer = null; }
+    }, 100);
+    elFadeTimer = id;
   }
-  function stopSiren(){
-    try { siren.pause(); siren.currentTime = 0; } catch (e) {}
+  function startSirenSound(){
+    stopSirenSound();
+    var token = ++alarmToken;
+    audioSessionPlayback();
+    var c = ensureContext();
+    if (!c) { playElementFade(token); return; }
+    var ready = c.state === 'running' ? Promise.resolve() : Promise.race([
+      Promise.resolve(c.resume ? c.resume() : null),
+      new Promise(function(_, rej){ setTimeout(function(){ rej(new Error('wacht te lang')); }, 600); })
+    ]);
+    ready.then(function(){
+      if (c.state !== 'running') throw new Error('audio niet actief');
+      return ensureBuffer();
+    }).then(function(buf){
+      if (token !== alarmToken) return;
+      var src = c.createBufferSource();
+      src.buffer = buf; src.loop = true; src.connect(gainNode);
+      var now = c.currentTime;
+      gainNode.gain.cancelScheduledValues(0);
+      try { gainNode.gain.setValueCurveAtTime(fadeCurve(), now, FADE_SEC); }
+      catch (e) { gainNode.gain.setValueAtTime(0, now); gainNode.gain.linearRampToValueAtTime(1, now + FADE_SEC); }
+      src.start(now);
+      bufSrc = src;
+    }).catch(function(){
+      if (token === alarmToken) playElementFade(token);
+    });
   }
   function finish(){
     state.acc = state.durationMs; state.running = false; state.startedAt = 0; state.finished = true;
     save();
     alarmOn = true;
     stopTest();
-    playSiren();
+    startSirenSound();
     keepAwake();
     render();
   }
   function stopAlarm(){
     alarmOn = false;
-    stopSiren();
+    stopSirenSound();
     allowSleep();
     render();
   }
   function stopTest(){
+    var wasTesting = !!testTimer;
     if (testTimer) { clearTimeout(testTimer); testTimer = null; }
     btnTest.classList.remove('playing');
     btnTest.textContent = 'Alarm testen';
-    if (!alarmOn) stopSiren();
+    if (wasTesting && !alarmOn) stopSirenSound();
   }
   btnTest.addEventListener('click', function(){
     if (testTimer) { stopTest(); return; }
-    playSiren();
-    audioUnlocked = true;
+    unlockAudio();
     btnTest.classList.add('playing');
     btnTest.textContent = 'Stop test';
-    testTimer = setTimeout(stopTest, 4000);
+    testTimer = setTimeout(stopTest, (FADE_SEC + 2) * 1000);
+    startSirenSound();
   });
 
   /* ---------- Scherm aan houden: twee methodes tegelijk ----------
@@ -582,7 +679,7 @@ var SIRENE_SRC = "data:audio/mpeg;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjYwLjE
     state.acc = elapsed(); state.running = false; state.startedAt = 0; save(); allowSleep(); render();
   }
   function resetTimer(){
-    if (alarmOn) { alarmOn = false; stopSiren(); }
+    if (alarmOn) { alarmOn = false; stopSirenSound(); }
     state.running = false; state.startedAt = 0; state.acc = 0; state.finished = false;
     save(); allowSleep(); clearConfirm(); render();
   }
@@ -618,29 +715,36 @@ var SIRENE_SRC = "data:audio/mpeg;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjYwLjE
   var downFields = document.getElementById('downFields');
   var upHint = document.getElementById('upHint');
   var minInput = document.getElementById('minInput');
+  var minUnit = document.getElementById('minUnit');
   var presets = document.getElementById('presets');
-  var draftMode = 'down';
+  var runNote = document.getElementById('runNote');
+  var MIN_SEC = 30, MAX_SEC = 599 * 60;
+  var draftMode = 'down', draftSec = DEFAULT_MIN * 60;
 
-  function clampMin(v){
-    v = parseInt(v, 10);
-    if (isNaN(v)) v = DEFAULT_MIN;
-    return Math.min(599, Math.max(1, v));
+  function clampSec(s){
+    s = Math.round(s);
+    if (!(s > 0)) s = DEFAULT_MIN * 60;
+    return Math.min(MAX_SEC, Math.max(MIN_SEC, s));
+  }
+  /* Onder een minuut staat er seconden in het vak, daarboven hele minuten */
+  function showDraft(){
+    if (draftSec < 60) { minInput.value = draftSec; minUnit.textContent = 'sec'; }
+    else { minInput.value = Math.round(draftSec / 60); minUnit.textContent = 'min'; }
   }
   function syncDraft(){
     modeDown.setAttribute('aria-checked', String(draftMode === 'down'));
     modeUp.setAttribute('aria-checked', String(draftMode === 'up'));
     downFields.style.display = draftMode === 'down' ? 'flex' : 'none';
     upHint.hidden = draftMode !== 'up';
-    var v = parseInt(minInput.value, 10);
     Array.prototype.forEach.call(presets.children, function(b){
-      b.setAttribute('aria-pressed', String(parseInt(b.dataset.min, 10) === v));
+      b.setAttribute('aria-pressed', String(parseInt(b.dataset.sec, 10) === draftSec));
     });
   }
-  var runNote = document.getElementById('runNote');
   function openSheet(){
     if (alarmOn) stopAlarm();
     draftMode = state.mode;
-    minInput.value = durationMin();
+    draftSec = clampSec(state.durationMs / 1000);
+    showDraft();
     syncDraft();
     var st = currentState();
     if (st === 'running') runNote.textContent = 'De tijd loopt. Opslaan stopt de timer en zet hem op de nieuwe tijd. Annuleren laat hem doorlopen.';
@@ -657,9 +761,8 @@ var SIRENE_SRC = "data:audio/mpeg;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjYwLjE
     try { btnSet.focus(); } catch (e) {}
   }
   function saveSheet(){
-    var mins = clampMin(minInput.value);
     state.mode = draftMode;
-    state.durationMs = mins * 60000;
+    state.durationMs = clampSec(draftSec) * 1000;
     state.running = false; state.startedAt = 0; state.acc = 0; state.finished = false;
     save();
     allowSleep();
@@ -675,14 +778,26 @@ var SIRENE_SRC = "data:audio/mpeg;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjYwLjE
   document.getElementById('btnSave').addEventListener('click', saveSheet);
   modeDown.addEventListener('click', function(){ draftMode = 'down'; syncDraft(); });
   modeUp.addEventListener('click', function(){ draftMode = 'up'; syncDraft(); });
-  document.getElementById('minMinus').addEventListener('click', function(){ minInput.value = clampMin(clampMin(minInput.value) - 1); syncDraft(); });
-  document.getElementById('minPlus').addEventListener('click', function(){ minInput.value = clampMin(clampMin(minInput.value) + 1); syncDraft(); });
-  minInput.addEventListener('input', syncDraft);
-  minInput.addEventListener('blur', function(){ minInput.value = clampMin(minInput.value); syncDraft(); });
+  document.getElementById('minMinus').addEventListener('click', function(){
+    draftSec = draftSec > 60 ? (Math.ceil(draftSec / 60) - 1) * 60 : MIN_SEC;
+    showDraft(); syncDraft();
+  });
+  document.getElementById('minPlus').addEventListener('click', function(){
+    draftSec = draftSec < 60 ? 60 : Math.min(MAX_SEC, (Math.floor(draftSec / 60) + 1) * 60);
+    showDraft(); syncDraft();
+  });
+  /* Typen gaat altijd in minuten */
+  minInput.addEventListener('input', function(){
+    var v = parseInt(minInput.value, 10);
+    if (!isNaN(v) && v >= 1) { draftSec = clampSec(v * 60); minUnit.textContent = 'min'; }
+    syncDraft();
+  });
+  minInput.addEventListener('blur', function(){ showDraft(); syncDraft(); });
   presets.addEventListener('click', function(e){
-    var b = e.target.closest('button[data-min]');
+    var b = e.target.closest('button[data-sec]');
     if (!b) return;
-    minInput.value = b.dataset.min; syncDraft();
+    draftSec = clampSec(parseInt(b.dataset.sec, 10));
+    showDraft(); syncDraft();
   });
   sheet.addEventListener('click', function(e){ if (e.target === sheet) closeSheet(); });
 
